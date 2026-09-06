@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>평행사변형이 되는 조건 탐구</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1e272e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 1200px;
+            height: 800px;
+            background-color: #ffffff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            transform-origin: center center;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .zone {
+            position: absolute;
+            top: 0;
+            height: 800px;
+        }
+
+        #inventory-zone {
+            left: 0;
+            width: 300px;
+            background-color: #f1f2f6;
+            border-right: 2px dashed #ced6e0;
+        }
+
+        #workspace-zone {
+            left: 300px;
+            width: 600px;
+            background-color: #ffffff;
+            background-image: radial-gradient(#dfe4ea 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #completed-zone {
+            left: 900px;
+            width: 300px;
+            background-color: #eccc6815;
+            border-left: 2px dashed #ced6e0;
+        }
+
+        .zone-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: #2f3542;
+            margin-top: 20px;
+            pointer-events: none;
+        }
+
+        .instruction {
+            position: absolute;
+            top: 55px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: #57606f;
+            font-size: 15px;
+            pointer-events: none;
+            line-height: 1.4;
+        }
+
+        .piece {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            top: 0; left: 0;
+            touch-action: none;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .piece svg {
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .piece polygon {
+            pointer-events: visiblePainted;
+            cursor: grab;
+        }
+
+        .piece polygon:active {
+            cursor: grabbing;
+        }
+
+        .rot-handle {
+            position: absolute;
+            top: 30px;
+            left: 135px;
+            width: 30px;
+            height: 30px;
+            background-color: #70a1ff;
+            color: white;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .rot-handle:active {
+            cursor: grabbing;
+            background-color: #1e90ff;
+        }
+
+        .piece.in-workspace:not(.snapped) .rot-handle {
+            display: flex;
+        }
+
+        .piece.snapped polygon {
+            cursor: default;
+        }
+
+        #modal {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+        }
+
+        #modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .modal-content {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 1000px;
+            width: 90%;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .modal-title {
+            color: #2ed573;
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .zoom-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 10px 0 20px 0;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #e2e8f0;
+            width: 100%;
+        }
+
+        .zoom-item {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .zoom-item svg {
+            width: 260px;
+            height: 180px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.08));
+        }
+
+        .question-box {
+            background-color: #e8f8f5;
+            border-left: 5px solid #2ed573;
+            padding: 16px 22px;
+            text-align: left;
+            border-radius: 6px;
+            width: 100%;
+        }
+
+        .question-box p {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            color: #10ac84;
+            font-weight: bold;
+        }
+
+        .question-box div {
+            font-size: 15px;
+            color: #2f3542;
+            line-height: 1.5;
+        }
+
+        /* 다시 하기 버튼 스타일 */
+        .reset-btn {
+            margin-top: 20px;
+            padding: 12px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #2ed573;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .reset-btn:hover {
+            background-color: #26af5f;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(46, 213, 115, 0.5);
+        }
+
+        .reset-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div id="inventory-zone" class="zone">
+            <div class="zone-title">도형 보관함</div>
+        </div>
+        <div id="workspace-zone" class="zone">
+            <div class="zone-title">평행사변형 만들기</div>
+            <div class="instruction">
+                도형을 중앙으로 가져온 뒤, 파란색 <b>↻ 버튼</b>을 드래그하여 회전시키세요.<br>
+                점선 가이드에 맞추어 평행사변형을 완성합니다.
+            </div>
+            
+            <svg width="600" height="800" style="position: absolute; top:0; left:0; pointer-events:none;">
+                <polygon points="540,120 480,220 660,220 720,120" fill="none" stroke="#a4b0be" stroke-width="2" stroke-dasharray="6,6" transform="translate(-300,0)"/>
+                <polygon points="550,345 490,435 650,435 710,345" fill="none" stroke="#a4b0be" stroke-width="2" stroke-dasharray="6,6" transform="translate(-300,0)"/>
+                <polygon points="540,580 490,660 660,660 710,580" fill="none" stroke="#a4b0be" stroke-width="2" stroke-dasharray="6,6" transform="translate(-300,0)"/>
+            </svg>
+        </div>
+        <div id="completed-zone" class="zone">
+            <div class="zone-title">완성된 영역</div>
+        </div>
+
+        <div id="pieces-container"></div>
+
+        <div id="modal" class="hidden">
+            <div class="modal-content">
+                <div class="modal-title">🎉 모든 평행사변형 완성!</div>
+                
+                <div class="zoom-container">
+                    <!-- 1번 확대 -->
+                    <div class="zoom-item">
+                        <svg viewBox="-150 -100 300 200">
+                            <polygon points="-60,-50 -120,50 60,50" fill="#ff475722" stroke="#ff4757" stroke-width="3"/>
+                            <polygon points="120,-50 60,50 -60,-50" fill="#ff475722" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-60" y1="-50" x2="60" y2="50" stroke="#747d8c" stroke-width="2" stroke-dasharray="4,4"/>
+                            <line x1="-94" y1="-3" x2="-86" y2="3" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="86" y1="-3" x2="94" y2="3" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-33" y1="44" x2="-33" y2="56" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-27" y1="44" x2="-27" y2="56" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="27" y1="-44" x2="27" y2="-56" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="33" y1="-44" x2="33" y2="-56" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-6" y1="-5" x2="6" y2="5" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-11" y1="-1" x2="1" y2="9" stroke="#ff4757" stroke-width="3"/>
+                            <line x1="-1" y1="-9" x2="11" y2="1" stroke="#ff4757" stroke-width="3"/>
+                        </svg>
+                    </div>
+                    <!-- 2번 확대 (동일한 곡률의 각 호 반영) -->
+                    <div class="zoom-item">
+                        <svg viewBox="-150 -100 300 200">
+                            <polygon points="-50,-45 -110,45 50,45" fill="#2ed57322" stroke="#2ed573" stroke-width="3"/>
+                            <polygon points="110,-45 50,45 -50,-45" fill="#2ed57322" stroke="#2ed573" stroke-width="3"/>
+                            <line x1="-50" y1="-45" x2="50" y2="45" stroke="#747d8c" stroke-width="2" stroke-dasharray="4,4"/>
+                            
+                            <!-- 균일하게 교정된 각 표시 -->
+                            <path d="M -35.1,-31.6 A 20 20 0 0 1 -61.1,-28.4" fill="none" stroke="#ff4757" stroke-width="3"/>
+                            <path d="M -98.9,28.4 A 20 20 0 0 1 -90,45" fill="none" stroke="#1e90ff" stroke-width="3"/>
+                            <path d="M 30,45 A 20 20 0 0 1 35.1,31.6" fill="none" stroke="#ffa502" stroke-width="3"/>
+
+                            <path d="M 35.1,31.6 A 20 20 0 0 1 61.1,28.4" fill="none" stroke="#ff4757" stroke-width="3"/>
+                            <path d="M 98.9,-28.4 A 20 20 0 0 1 90,-45" fill="none" stroke="#1e90ff" stroke-width="3"/>
+                            <path d="M -30,-45 A 20 20 0 0 1 -35.1,-31.6" fill="none" stroke="#ffa502" stroke-width="3"/>
+
+                            <line x1="-7" y1="8" x2="7" y2="-8" stroke="#2ed573" stroke-width="3.5"/>
+                        </svg>
+                    </div>
+                    <!-- 3번 확대 -->
+                    <div class="zoom-item">
+                        <svg viewBox="-150 -100 300 200">
+                            <polygon points="0,0 -60,-40 -110,40" fill="#1e90ff22" stroke="#1e90ff" stroke-width="3"/>
+                            <polygon points="0,0 -110,40 60,40" fill="#ffa50222" stroke="#ffa502" stroke-width="3"/>
+                            <polygon points="0,0 60,40 110,-40" fill="#1e90ff22" stroke="#1e90ff" stroke-width="3"/>
+                            <polygon points="0,0 110,-40 -60,-40" fill="#ffa50222" stroke="#ffa502" stroke-width="3"/>
+                            
+                            <line x1="-34" y1="-15" x2="-26" y2="-25" stroke="#1e90ff" stroke-width="3"/>
+                            <line x1="-30" y1="-11" x2="-22" y2="-21" stroke="#1e90ff" stroke-width="3"/>
+                            <line x1="26" y1="25" x2="34" y2="15" stroke="#1e90ff" stroke-width="3"/>
+                            <line x1="22" y1="21" x2="30" y2="11" stroke="#1e90ff" stroke-width="3"/>
+                            <line x1="-58" y1="14" x2="-52" y2="26" stroke="#ffa502" stroke-width="3"/>
+                            <line x1="52" y1="-26" x2="58" y2="-14" stroke="#ffa502" stroke-width="3"/>
+                            
+                            <path d="M -18,-12 A 20 20 0 0 0 -22,8" fill="none" stroke="#ff4757" stroke-width="2.5"/>
+                            <path d="M 18,12 A 20 20 0 0 0 22,-8" fill="none" stroke="#ff4757" stroke-width="2.5"/>
+                            <path d="M -22,8 A 20 20 0 0 0 15,10" fill="none" stroke="#1e90ff" stroke-width="2.5"/>
+                            <path d="M 22,-8 A 20 20 0 0 0 -15,-10" fill="none" stroke="#1e90ff" stroke-width="2.5"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="question-box">
+                    <p>💡 생각해보기 질문</p>
+                    <div>
+                        1. 각 평행사변형을 이루는 삼각형들의 <strong>변의 길이</strong>와 <strong>각의 크기</strong>에는 어떤 조건이 주어져 있나요?<br>
+                        2. 만들어진 도형들이 <strong>평행사변형이 되는 이유</strong>를 기하학적 조건과 연결 지어 설명해 봅시다.
+                    </div>
+                </div>
+
+                <button id="reset-btn" class="reset-btn">🔄 다시 하기</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const wrapper = document.getElementById('game-wrapper');
+    let gameScale = 1;
+
+    function resize() {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        const scaleX = (winW * 0.95) / 1200;
+        const scaleY = (winH * 0.95) / 800;
+        gameScale = Math.min(scaleX, scaleY);
+        wrapper.style.transform = `scale(${gameScale})`;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const targets = [
+        { mainGroup: '1', subGroup: '1', x: 600, y: 170, angle: 0, isFilled: false },
+        { mainGroup: '1', subGroup: '1', x: 600, y: 170, angle: 180, isFilled: false },
+        
+        { mainGroup: '2', subGroup: '2', x: 600, y: 390, angle: 0, isFilled: false },
+        { mainGroup: '2', subGroup: '2', x: 600, y: 390, angle: 180, isFilled: false },
+        
+        { mainGroup: '3', subGroup: '3_A', x: 600, y: 620, angle: 0, isFilled: false },
+        { mainGroup: '3', subGroup: '3_A', x: 600, y: 620, angle: 180, isFilled: false },
+        { mainGroup: '3', subGroup: '3_B', x: 600, y: 620, angle: 0, isFilled: false },
+        { mainGroup: '3', subGroup: '3_B', x: 600, y: 620, angle: 180, isFilled: false }
+    ];
+
+    // 보관함 내 정돈된 초기 좌표 (제목 가림 방지 및 영역 내 중앙 배치)
+    const initialPositions = [
+        { x: 135, y: 110, angle: 0 },
+        { x: 160, y: 190, angle: 0 },
+        { x: 135, y: 270, angle: 0 },
+        { x: 160, y: 350, angle: 0 },
+        { x: 135, y: 430, angle: 0 },
+        { x: 160, y: 510, angle: 0 },
+        { x: 135, y: 590, angle: 0 },
+        { x: 160, y: 670, angle: 0 }
+    ];
+
+    const piecesData = [
+        // 그룹 1
+        {
+            mainGroup: '1', subGroup: '1',
+            svgContent: `
+                <polygon points="-60,-50 -120,50 60,50" fill="#ff475722" stroke="#ff4757" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-94" y1="-3" x2="-86" y2="3" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-33" y1="44" x2="-33" y2="56" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-27" y1="44" x2="-27" y2="56" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-6" y1="-5" x2="6" y2="5" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-11" y1="-1" x2="1" y2="9" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-1" y1="-9" x2="11" y2="1" stroke="#ff4757" stroke-width="3"/>
+            `
+        },
+        {
+            mainGroup: '1', subGroup: '1',
+            svgContent: `
+                <polygon points="-60,-50 -120,50 60,50" fill="#ff475722" stroke="#ff4757" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-94" y1="-3" x2="-86" y2="3" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-33" y1="44" x2="-33" y2="56" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-27" y1="44" x2="-27" y2="56" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-6" y1="-5" x2="6" y2="5" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-11" y1="-1" x2="1" y2="9" stroke="#ff4757" stroke-width="3"/>
+                <line x1="-1" y1="-9" x2="11" y2="1" stroke="#ff4757" stroke-width="3"/>
+            `
+        },
+
+        // 그룹 2 (각 호의 곡률 매개변수를 완전히 동일하게 통일)
+        {
+            mainGroup: '2', subGroup: '2',
+            svgContent: `
+                <polygon points="-50,-45 -110,45 50,45" fill="#2ed57322" stroke="#2ed573" stroke-width="3" stroke-linejoin="round"/>
+                <path d="M -35.1,-31.6 A 20 20 0 0 1 -61.1,-28.4" fill="none" stroke="#ff4757" stroke-width="3"/>
+                <path d="M -98.9,28.4 A 20 20 0 0 1 -90,45" fill="none" stroke="#1e90ff" stroke-width="3"/>
+                <path d="M 30,45 A 20 20 0 0 1 35.1,31.6" fill="none" stroke="#ffa502" stroke-width="3"/>
+                <line x1="-7" y1="8" x2="7" y2="-8" stroke="#2ed573" stroke-width="3.5"/>
+            `
+        },
+        {
+            mainGroup: '2', subGroup: '2',
+            svgContent: `
+                <polygon points="-50,-45 -110,45 50,45" fill="#2ed57322" stroke="#2ed573" stroke-width="3" stroke-linejoin="round"/>
+                <path d="M -35.1,-31.6 A 20 20 0 0 1 -61.1,-28.4" fill="none" stroke="#ff4757" stroke-width="3"/>
+                <path d="M -98.9,28.4 A 20 20 0 0 1 -90,45" fill="none" stroke="#1e90ff" stroke-width="3"/>
+                <path d="M 30,45 A 20 20 0 0 1 35.1,31.6" fill="none" stroke="#ffa502" stroke-width="3"/>
+                <line x1="-7" y1="8" x2="7" y2="-8" stroke="#2ed573" stroke-width="3.5"/>
+            `
+        },
+
+        // 그룹 3
+        {
+            mainGroup: '3', subGroup: '3_A',
+            svgContent: `
+                <polygon points="0,0 -60,-40 -110,40" fill="#1e90ff22" stroke="#1e90ff" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-34" y1="-15" x2="-26" y2="-25" stroke="#1e90ff" stroke-width="3"/>
+                <line x1="-30" y1="-11" x2="-22" y2="-21" stroke="#1e90ff" stroke-width="3"/>
+                <line x1="-58" y1="14" x2="-52" y2="26" stroke="#1e90ff" stroke-width="3"/>
+                <path d="M -18,-12 A 20 20 0 0 0 -22,8" fill="none" stroke="#ff4757" stroke-width="2.5"/>
+            `
+        },
+        {
+            mainGroup: '3', subGroup: '3_A',
+            svgContent: `
+                <polygon points="0,0 -60,-40 -110,40" fill="#1e90ff22" stroke="#1e90ff" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-34" y1="-15" x2="-26" y2="-25" stroke="#1e90ff" stroke-width="3"/>
+                <line x1="-30" y1="-11" x2="-22" y2="-21" stroke="#1e90ff" stroke-width="3"/>
+                <line x1="-58" y1="14" x2="-52" y2="26" stroke="#1e90ff" stroke-width="3"/>
+                <path d="M -18,-12 A 20 20 0 0 0 -22,8" fill="none" stroke="#ff4757" stroke-width="2.5"/>
+            `
+        },
+        {
+            mainGroup: '3', subGroup: '3_B',
+            svgContent: `
+                <polygon points="0,0 -110,40 60,40" fill="#ffa50222" stroke="#ffa502" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-58" y1="14" x2="-52" y2="26" stroke="#ffa502" stroke-width="3"/>
+                <line x1="26" y1="25" x2="34" y2="15" stroke="#ffa502" stroke-width="3"/>
+                <line x1="22" y1="21" x2="30" y2="11" stroke="#ffa502" stroke-width="3"/>
+                <path d="M -22,8 A 20 20 0 0 0 15,10" fill="none" stroke="#1e90ff" stroke-width="2.5"/>
+            `
+        },
+        {
+            mainGroup: '3', subGroup: '3_B',
+            svgContent: `
+                <polygon points="0,0 -110,40 60,40" fill="#ffa50222" stroke="#ffa502" stroke-width="3" stroke-linejoin="round"/>
+                <line x1="-58" y1="14" x2="-52" y2="26" stroke="#ffa502" stroke-width="3"/>
+                <line x1="26" y1="25" x2="34" y2="15" stroke="#ffa502" stroke-width="3"/>
+                <line x1="22" y1="21" x2="30" y2="11" stroke="#ffa502" stroke-width="3"/>
+                <path d="M -22,8 A 20 20 0 0 0 15,10" fill="none" stroke="#1e90ff" stroke-width="2.5"/>
+            `
+        }
+    ];
+
+    const container = document.getElementById('pieces-container');
+
+    piecesData.forEach((data, i) => {
+        const el = document.createElement('div');
+        el.className = 'piece';
+        el.dataset.mainGroup = data.mainGroup;
+        el.dataset.subGroup = data.subGroup;
+        
+        const pos = initialPositions[i];
+        el.dataset.x = pos.x;
+        el.dataset.y = pos.y;
+        el.dataset.angle = pos.angle;
+        el.dataset.snapped = "false";
+
+        el.innerHTML = `
+            <div class="rot-handle">↻</div>
+            <svg viewBox="-150 -150 300 300">
+                ${data.svgContent}
+            </svg>
+        `;
+        
+        container.appendChild(el);
+        updateTransform(el);
+    });
+
+    function updateTransform(el) {
+        const x = parseFloat(el.dataset.x);
+        const y = parseFloat(el.dataset.y);
+        const angle = parseFloat(el.dataset.angle);
+
+        if (x >= 280 && x <= 920) {
+            el.classList.add('in-workspace');
+        } else {
+            el.classList.remove('in-workspace');
+        }
+
+        el.style.transform = `translate(${x - 150}px, ${y - 150}px) rotate(${angle}deg)`;
+    }
+
+    let activePiece = null;
+    let isDragging = false;
+    let isRotating = false;
+    let startPointerX, startPointerY, startPieceX, startPieceY;
+
+    document.addEventListener('pointerdown', (e) => {
+        const handle = e.target.closest('.rot-handle');
+        const piece = e.target.closest('.piece');
+
+        if (piece && piece.dataset.snapped === "false") {
+            activePiece = piece;
+            piece.parentNode.appendChild(piece);
+
+            if (handle) {
+                isRotating = true;
+                handle.setPointerCapture(e.pointerId);
+            } else {
+                isDragging = true;
+                const polygon = piece.querySelector('polygon');
+                if (polygon) polygon.setPointerCapture(e.pointerId);
+                
+                startPointerX = e.clientX / gameScale;
+                startPointerY = e.clientY / gameScale;
+                startPieceX = parseFloat(piece.dataset.x);
+                startPieceY = parseFloat(piece.dataset.y);
+            }
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!activePiece) return;
+
+        if (isDragging) {
+            const dx = (e.clientX / gameScale) - startPointerX;
+            const dy = (e.clientY / gameScale) - startPointerY;
+            
+            let newX = startPieceX + dx;
+            let newY = startPieceY + dy;
+
+            newX = Math.max(50, Math.min(1150, newX));
+            newY = Math.max(50, Math.min(750, newY));
+
+            activePiece.dataset.x = newX;
+            activePiece.dataset.y = newY;
+            updateTransform(activePiece);
+        } else if (isRotating) {
+            const rect = activePiece.getBoundingClientRect();
+            const centerX = (rect.left + rect.width / 2) / gameScale;
+            const centerY = (rect.top + rect.height / 2) / gameScale;
+
+            const pointerX = e.clientX / gameScale;
+            const pointerY = e.clientY / gameScale;
+
+            const rad = Math.atan2(pointerY - centerY, pointerX - centerX);
+            let deg = rad * (180 / Math.PI) + 90;
+            
+            if (deg < 0) deg += 360;
+
+            activePiece.dataset.angle = deg;
+            updateTransform(activePiece);
+        }
+    });
+
+    document.addEventListener('pointerup', (e) => {
+        if (activePiece) {
+            if (isDragging || isRotating) {
+                checkSnap(activePiece);
+            }
+            isDragging = false;
+            isRotating = false;
+            activePiece = null;
+        }
+    });
+
+    function checkSnap(piece) {
+        const cx = parseFloat(piece.dataset.x);
+        const cy = parseFloat(piece.dataset.y);
+        let ca = (parseFloat(piece.dataset.angle) % 360 + 360) % 360;
+
+        const subGroup = piece.dataset.subGroup;
+        const mainGroup = piece.dataset.mainGroup;
+
+        const possibleTargets = targets.filter(t => t.subGroup === subGroup && !t.isFilled);
+
+        for (let target of possibleTargets) {
+            const dist = Math.hypot(cx - target.x, cy - target.y);
+            
+            let angleDiff = Math.abs(ca - target.angle);
+            if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+            if (dist < 40 && angleDiff < 15) {
+                piece.dataset.x = target.x;
+                piece.dataset.y = target.y;
+                piece.dataset.angle = target.angle;
+                piece.dataset.snapped = "true";
+                piece.classList.add('snapped');
+                updateTransform(piece);
+                
+                target.isFilled = true;
+                checkGroupCompletion(mainGroup);
+                break;
+            }
+        }
+    }
+
+    function checkGroupCompletion(mainGroup) {
+        const isGroupComplete = targets.filter(t => t.mainGroup === mainGroup).every(t => t.isFilled);
+        
+        if (isGroupComplete) {
+            setTimeout(() => {
+                const groupPieces = document.querySelectorAll(`.piece[data-main-group="${mainGroup}"]`);
+                groupPieces.forEach(p => {
+                    p.style.transition = "transform 0.8s ease-in-out";
+                    const currentX = parseFloat(p.dataset.x);
+                    p.dataset.x = currentX + 450;
+                    updateTransform(p);
+                    
+                    setTimeout(() => {
+                        p.style.transition = "";
+                    }, 800);
+                });
+
+                checkGameCompletion();
+            }, 300);
+        }
+    }
+
+    function checkGameCompletion() {
+        const isAllComplete = targets.every(t => t.isFilled);
+        if (isAllComplete) {
+            setTimeout(() => {
+                document.getElementById('modal').classList.remove('hidden');
+            }, 1000);
+        }
+    }
+
+    // 초기화 (다시 하기) 함수
+    function resetGame() {
+        document.getElementById('modal').classList.add('hidden');
+
+        targets.forEach(t => t.isFilled = false);
+
+        const pieces = document.querySelectorAll('.piece');
+        pieces.forEach((el, i) => {
+            const pos = initialPositions[i];
+            el.dataset.x = pos.x;
+            el.dataset.y = pos.y;
+            el.dataset.angle = pos.angle;
+            el.dataset.snapped = "false";
+            el.classList.remove('snapped', 'in-workspace');
+            
+            el.style.transition = "transform 0.5s ease-in-out";
+            updateTransform(el);
+            setTimeout(() => {
+                el.style.transition = "";
+            }, 500);
+        });
+    }
+
+    document.getElementById('reset-btn').addEventListener('click', resetGame);
+</script>
+</body>
+</html>
